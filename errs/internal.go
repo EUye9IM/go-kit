@@ -40,6 +40,12 @@ func (e *errInnerType) Unwrap() error {
 	}
 	return e.err
 }
+func (e *errInnerType) GetPc() uintptr {
+	if e == nil {
+		return 0
+	}
+	return e.pc
+}
 
 func getPc() uintptr {
 	pc, _, _, ok := runtime.Caller(2)
@@ -49,22 +55,30 @@ func getPc() uintptr {
 	return pc
 }
 
+type pcGetter interface {
+	GetPc() uintptr
+}
+
+func getFuncName(p pcGetter) string {
+	if p == nil || p.GetPc() == 0 {
+		return ""
+	}
+	fun := runtime.FuncForPC(p.GetPc())
+	if fun == nil {
+		return ""
+	}
+	nameSplite := strings.Split(fun.Name(), "/")
+	if len(nameSplite) == 0 {
+		return ""
+	}
+	return nameSplite[len(nameSplite)-1]
+}
+
 func (e *errInnerType) getFuncName() string {
 	if e.funcNameCache != nil {
 		return *e.funcNameCache
 	}
 	e.funcNameCache = new(string)
-	fun := runtime.FuncForPC(e.pc)
-	if fun == nil {
-		*e.funcNameCache = ""
-		return ""
-	}
-	nameSplite := strings.Split(fun.Name(), "/")
-	if len(nameSplite) == 0 {
-		*e.funcNameCache = ""
-		return ""
-	}
-	name := nameSplite[len(nameSplite)-1]
-	*e.funcNameCache = name
-	return name
+	*e.funcNameCache = getFuncName(e)
+	return *e.funcNameCache
 }
