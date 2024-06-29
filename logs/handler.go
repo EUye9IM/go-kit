@@ -14,15 +14,11 @@ import (
 	"github.com/fatih/color"
 )
 
-type PrintFunc func(t time.Time, Level slog.Level, pc uintptr, msg string, groups []string, attr []slog.Attr) string
+type PrintFunc func(t time.Time, Level slog.Level, pc uintptr, msg string, attr []slog.Attr) string
 
-func defaultPrintFunc(t time.Time, level slog.Level, pc uintptr, msg string, groups []string, attr []slog.Attr) string {
+func defaultPrintFunc(t time.Time, level slog.Level, pc uintptr, msg string, attr []slog.Attr) string {
 	timeStr := color.BlackString("%v", t.Local().Format("2006-01-02 15:04:05.000"))
-	groupStr := strings.Builder{}
-	for _, g := range groups {
-		groupStr.WriteString(g)
-		groupStr.WriteByte('.')
-	}
+
 	sourceStr := ""
 	fun := runtime.FuncForPC(pc)
 	if fun != nil {
@@ -33,7 +29,7 @@ func defaultPrintFunc(t time.Time, level slog.Level, pc uintptr, msg string, gro
 	attrStr := strings.Builder{}
 	for _, a := range attr {
 		attrStr.WriteByte(' ')
-		attrStr.WriteString(color.BlackString("%v%v=", groupStr.String(), a.Key))
+		attrStr.WriteString(color.BlackString("%v=", a.Key))
 		attrStr.WriteString(color.MagentaString("%v", a.Value.String()))
 	}
 
@@ -66,7 +62,7 @@ type Options struct {
 type Handler struct {
 	opt               Options
 	preformattedAttrs []slog.Attr
-	groups            []string // all groups started from WithGroup
+	groups            string // all groups started from WithGroup
 	mu                *sync.Mutex
 	w                 io.Writer
 }
@@ -86,11 +82,10 @@ func NewHandler(w io.Writer, opt *Options) *Handler {
 }
 func (h *Handler) clone() *Handler {
 	// We can't use assignment because we can't copy the mutex.
-
 	return &Handler{
 		opt:               h.opt,
 		preformattedAttrs: append([]slog.Attr(nil), h.preformattedAttrs...),
-		groups:            append([]string(nil), h.groups...),
+		groups:            h.groups,
 		mu:                h.mu,
 		w:                 h.w,
 	}
@@ -134,14 +129,17 @@ func (h *Handler) Handle(_ context.Context, r slog.Record) error {
 	var a []slog.Attr
 	a = append(a, h.preformattedAttrs...)
 	r.Attrs(func(attr slog.Attr) bool {
-		a = append(a, attr)
+		a = append(a, slog.Attr{
+			Key:   h.groups + attr.Key,
+			Value: attr.Value,
+		})
 		return true
 	})
 	var pc uintptr
 	if h.opt.WithSource {
 		pc = r.PC
 	}
-	str := h.opt.PrintFunc(r.Time, r.Level, pc, r.Message, h.groups, a)
+	str := h.opt.PrintFunc(r.Time, r.Level, pc, r.Message, a)
 	h.mu.Lock()
 	fmt.Fprintln(h.w, str)
 	h.mu.Unlock()
@@ -153,7 +151,11 @@ func (h *Handler) Handle(_ context.Context, r slog.Record) error {
 // The Handler owns the slice: it may retain, modify or discard it.
 func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	h2 := h.clone()
-	h2.preformattedAttrs = append(h2.preformattedAttrs, attrs...)
+	for i := range attrs {
+		h2.preformattedAttrs = append(h2.preformattedAttrs,
+			slog.Attr{Key: h.groups + attrs[i].Key, Value: attrs[i].Value},
+		)
+	}
 	return h2
 }
 
@@ -179,7 +181,7 @@ func (h *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 func (h *Handler) WithGroup(name string) slog.Handler {
 	h2 := h.clone()
 	if name != "" {
-		h2.groups = append(h2.groups, name)
+		h2.groups += name + "."
 	}
 	return h2
 }
