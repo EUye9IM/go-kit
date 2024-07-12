@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/EUye9IM/go-kit/debounce"
+	"github.com/EUye9IM/go-kit/testtool"
 )
 
 const d = 10 * time.Millisecond
@@ -27,26 +28,19 @@ func testChan(t *testing.T, src chan<- int, dst <-chan []int,
 		}
 		close(src)
 	}()
-	i := 0
-	for d := range dst {
-		if i >= len(output) {
-			t.Fatal("unexpect data")
-			break
-		}
-		t.Log("recv", d, "expect", output[i])
-		if len(d) != len(output[i]) {
-			t.Fatal("unexpect data len")
-		}
-		for i, v := range output[i] {
-			if v != d[i] {
-				t.Fatal("unexpect data value")
+	testtool.TestCase(t, func(c testtool.Case) {
+		i := 0
+		for d := range dst {
+			if i >= len(output) {
+				t.Fatal("unexpect data")
+				break
 			}
+			t.Log("recv", d, "expect", output[i])
+			c.Assert(len(d), len(output[i]))
+			i++
 		}
-		i++
-	}
-	if i != len(output) {
-		t.Fatal("unexpect close")
-	}
+		c.Assert(i, len(output))
+	})
 }
 func TestNewChan(t *testing.T) {
 	srcCh := make(chan int)
