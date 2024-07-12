@@ -33,18 +33,17 @@ func defaultPrintFunc(t time.Time, level slog.Level, pc uintptr, msg string, att
 		attrStr.WriteString(color.MagentaString("%v", a.Value.String()))
 	}
 
-	levelStr := ""
+	levelStr := fmt.Sprintf("%6v", level)
 	switch {
-	case level < slog.LevelDebug:
-		levelStr = color.BlueString("%v", level)
-	case level < slog.LevelInfo:
-		levelStr = color.BlueString("%v", level)
+	case level < slog.LevelDebug,
+		level < slog.LevelInfo:
+		levelStr = color.BlueString(levelStr)
 	case level < slog.LevelWarn:
-		levelStr = color.GreenString("%v", level)
+		levelStr = color.GreenString(levelStr)
 	case level < slog.LevelError:
-		levelStr = color.YellowString("%v", level)
+		levelStr = color.YellowString(levelStr)
 	default:
-		levelStr = color.RedString("%v", level)
+		levelStr = color.RedString(levelStr)
 	}
 
 	return fmt.Sprint(
