@@ -14,16 +14,14 @@ import (
 	"github.com/fatih/color"
 )
 
-type PrintFunc func(t time.Time, Level slog.Level, pc uintptr, msg string, attr []slog.Attr) string
+type PrintFunc func(t time.Time, Level slog.Level, source *runtime.Frame, msg string, attr []slog.Attr) string
 
-func defaultPrintFunc(t time.Time, level slog.Level, pc uintptr, msg string, attr []slog.Attr) string {
+func defaultPrintFunc(t time.Time, level slog.Level, source *runtime.Frame, msg string, attr []slog.Attr) string {
 	timeStr := color.BlackString("%v", t.Local().Format("2006-01-02 15:04:05.000"))
 
 	sourceStr := ""
-	fun := runtime.FuncForPC(pc)
-	if fun != nil {
-		file, line := fun.FileLine(pc)
-		sourceStr = color.BlackString("%v:%v ", filepath.Base(file), line)
+	if source != nil {
+		sourceStr = color.BlackString("%v:%v ", filepath.Base(source.File), source.Line)
 	}
 
 	attrStr := strings.Builder{}
@@ -53,9 +51,17 @@ func defaultPrintFunc(t time.Time, level slog.Level, pc uintptr, msg string, att
 }
 
 type Options struct {
-	WithSource bool
-	Level      slog.Leveler
-	PrintFunc  PrintFunc
+	AddSource bool
+	Level     slog.Leveler
+	PrintFunc PrintFunc
+}
+
+func (o *Options) copy() *Options {
+	var o2 Options
+	if o != nil {
+		o2 = *o
+	}
+	return &o2
 }
 
 type Handler struct {
@@ -67,9 +73,7 @@ type Handler struct {
 }
 
 func NewHandler(w io.Writer, opt *Options) *Handler {
-	if opt == nil {
-		opt = &Options{}
-	}
+	opt = opt.copy()
 	if opt.PrintFunc == nil {
 		opt.PrintFunc = defaultPrintFunc
 	}
@@ -134,11 +138,13 @@ func (h *Handler) Handle(_ context.Context, r slog.Record) error {
 		})
 		return true
 	})
-	var pc uintptr
-	if h.opt.WithSource {
-		pc = r.PC
+	var str string
+	if h.opt.AddSource {
+		source, _ := runtime.CallersFrames([]uintptr{r.PC}).Next()
+		str = h.opt.PrintFunc(r.Time, r.Level, &source, r.Message, a)
+	} else {
+		str = h.opt.PrintFunc(r.Time, r.Level, nil, r.Message, a)
 	}
-	str := h.opt.PrintFunc(r.Time, r.Level, pc, r.Message, a)
 	h.mu.Lock()
 	fmt.Fprintln(h.w, str)
 	h.mu.Unlock()
