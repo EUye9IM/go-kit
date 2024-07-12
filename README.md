@@ -10,7 +10,13 @@ go 自用组件
 
 chan 消抖
 
-## ds/list
+## ds
+
+## stack
+
+栈
+
+### list
 
 从标准库抄的，改成了泛型
 
