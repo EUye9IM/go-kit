@@ -1,3 +1,6 @@
+/*
+testtool 测试相关工具
+*/
 package testtool
 
 import (
@@ -6,7 +9,9 @@ import (
 	"runtime/debug"
 )
 
+// Case 用例接口
 type Case interface {
+	// 断言 got 与 expect 相同
 	Assert(got, expect any)
 }
 
@@ -39,6 +44,7 @@ func (c caseImpl) Assert(got, expect any) {
 	}
 }
 
+// 测试一个用例
 func TestCase(t testItf, c func(Case)) {
 	tc := caseImpl{t}
 	c(tc)

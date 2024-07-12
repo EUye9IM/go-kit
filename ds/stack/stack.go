@@ -1,3 +1,4 @@
+// stack 实现栈
 package stack
 
 type Stack[T any] struct {

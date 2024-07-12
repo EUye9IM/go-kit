@@ -1,3 +1,8 @@
+/*
+logs 实现 slog 的 handler
+
+没有很好的性能，只是在控制台上有人类友好的输出。对于日志性能高的场合请使用其他方案。
+*/
 package logs
 
 import (
@@ -14,6 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
+// PrintFunc 用于单条对日志生成字符串
 type PrintFunc func(t time.Time, Level slog.Level, source *runtime.Frame, msg string, attr []slog.Attr) string
 
 func defaultPrintFunc(t time.Time, level slog.Level, source *runtime.Frame, msg string, attr []slog.Attr) string {
@@ -28,7 +34,7 @@ func defaultPrintFunc(t time.Time, level slog.Level, source *runtime.Frame, msg 
 	for _, a := range attr {
 		attrStr.WriteByte(' ')
 		attrStr.WriteString(color.BlackString("%v=", a.Key))
-		attrStr.WriteString(color.MagentaString("%v", a.Value.String()))
+		attrStr.WriteString(color.MagentaString(a.Value.String()))
 	}
 
 	levelStr := fmt.Sprintf("%6v", level)
@@ -50,6 +56,7 @@ func defaultPrintFunc(t time.Time, level slog.Level, source *runtime.Frame, msg 
 		msg, attrStr.String())
 }
 
+// 选项
 type Options struct {
 	AddSource bool
 	Level     slog.Leveler
